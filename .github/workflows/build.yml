@@ -1,0 +1,64 @@
+name: Build CentOS 6 RPM & push to PackageCloud
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  PACKAGECLOUD_REPO: ${{ vars.PACKAGECLOUD_REPO }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: centos:6
+    steps:
+      - name: Prepare CentOS 6 yum repos
+        run: |
+          set -euo pipefail
+          sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
+                 -e 's|^#baseurl=http://mirror.centos.org/centos/\$releasever|baseurl=http://vault.centos.org/6.10|' \
+                 /etc/yum.repos.d/CentOS-Base.repo
+          grep -q 'vault.centos.org/6.10' /etc/yum.repos.d/CentOS-Base.repo
+          yum install -y git
+
+      - uses: actions/checkout@v4
+
+      - name: Build RPM
+        run: |
+          set -euo pipefail
+
+          yum install -y yum-utils rpm-build
+          rpm -ivh https://dl.fedoraproject.org/pub/archive/epel/7/SRPMS/Packages/o/openssl11-1.1.1k-7.el7.src.rpm
+          cp "$GITHUB_WORKSPACE/openssl11.spec" ~/rpmbuild/SPECS/
+
+          yum-builddep -y ~/rpmbuild/SPECS/openssl11.spec || true
+
+          rpmbuild -ba --nocheck ~/rpmbuild/SPECS/openssl11.spec
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          mv ~/rpmbuild/RPMS/*/*.rpm "$GITHUB_WORKSPACE/dist/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpms
+          path: dist/*.rpm
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: rpms
+          path: dist
+
+      - name: Push to PackageCloud
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+        run: |
+          sudo gem install package_cloud
+          package_cloud push "$PACKAGECLOUD_REPO/el/6" dist/*.rpm
