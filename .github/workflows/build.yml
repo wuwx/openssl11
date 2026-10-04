@@ -31,11 +31,11 @@ jobs:
 
           yum install -y epel-release yum-utils rpm-build
 
-          # EPEL 6 提供 spec 里的 perl-interpreter；它已归档，metalink 失效
+          # EPEL 6 提供 spec 里的 perl-interpreter；它已归档，且 yum-builddep 会启用 -source 源
           sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
-                 -e 's|^#baseurl=http://download.fedoraproject.org/pub/epel/6/\$basearch|baseurl=https://archives.fedoraproject.org/pub/archive/epel/6/$basearch|' \
-                 /etc/yum.repos.d/epel.repo
-          grep -q 'archives.fedoraproject.org' /etc/yum.repos.d/epel.repo
+                 -e 's|^#baseurl=http://download.fedoraproject.org/pub/epel/|baseurl=https://archives.fedoraproject.org/pub/archive/epel/|' \
+                 /etc/yum.repos.d/epel*.repo
+          for f in /etc/yum.repos.d/epel*.repo; do grep -q 'archives.fedoraproject.org' "$f"; done
 
           rpm -ivh /ws/openssl11.src.rpm
           cp /ws/openssl11.spec ~/rpmbuild/SPECS/
