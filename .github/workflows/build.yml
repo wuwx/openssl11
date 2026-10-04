@@ -46,7 +46,7 @@ jobs:
           rpmbuild -ba ~/rpmbuild/SPECS/openssl11.spec
 
           mkdir -p /ws/dist
-          cp ~/rpmbuild/RPMS/*/*.rpm /ws/dist/
+          cp ~/rpmbuild/RPMS/*/*.rpm ~/rpmbuild/SRPMS/*.src.rpm /ws/dist/
           EOS
 
       - name: Push to PackageCloud
@@ -55,4 +55,4 @@ jobs:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         run: |
           sudo gem install package_cloud
-          package_cloud push "$PACKAGECLOUD_REPO/el/6" dist/*.rpm
+          package_cloud push --skip-duplicates "$PACKAGECLOUD_REPO/el/6" dist/*.rpm
