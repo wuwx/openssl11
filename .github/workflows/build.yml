@@ -15,24 +15,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build RPM in centos:6
+      - name: Download src.rpm
         run: |
           curl -fSL --retry 3 -o openssl11.src.rpm \
             https://dl.fedoraproject.org/pub/archive/epel/7/SRPMS/Packages/o/openssl11-1.1.1k-7.el7.src.rpm
           file openssl11.src.rpm | grep -q RPM
+
+      - name: Build RPM in centos:6
+        run: |
           docker run --rm -i -v "$PWD:/ws" -w /ws centos:6 bash -euo pipefail -s <<'EOS'
           sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
                  -e 's|^#baseurl=http://mirror.centos.org/centos/\$releasever|baseurl=http://vault.centos.org/6.10|' \
                  /etc/yum.repos.d/CentOS-Base.repo
           grep -q 'vault.centos.org/6.10' /etc/yum.repos.d/CentOS-Base.repo
 
-          yum install -y yum-utils rpm-build
+          yum install -y epel-release yum-utils rpm-build
+
+          # EPEL 6 提供 spec 里的 perl-interpreter；它已归档，metalink 失效
+          sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
+                 -e 's|^#baseurl=http://download.fedoraproject.org/pub/epel/6/\$basearch|baseurl=https://archives.fedoraproject.org/pub/archive/epel/6/$basearch|' \
+                 /etc/yum.repos.d/epel.repo
+          grep -q 'archives.fedoraproject.org' /etc/yum.repos.d/epel.repo
+
           rpm -ivh /ws/openssl11.src.rpm
           cp /ws/openssl11.spec ~/rpmbuild/SPECS/
 
-          yum-builddep -y ~/rpmbuild/SPECS/openssl11.spec || true
+          yum-builddep -y ~/rpmbuild/SPECS/openssl11.spec
 
-          rpmbuild -ba --nocheck ~/rpmbuild/SPECS/openssl11.spec
+          # el6 的 rpmbuild（4.8）没有 --nocheck 选项
+          rpmbuild -ba ~/rpmbuild/SPECS/openssl11.spec
 
           mkdir -p /ws/dist
           cp ~/rpmbuild/RPMS/*/*.rpm /ws/dist/
