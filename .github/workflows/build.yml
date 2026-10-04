@@ -17,6 +17,9 @@ jobs:
 
       - name: Build RPM in centos:6
         run: |
+          curl -fSL --retry 3 -o openssl11.src.rpm \
+            https://dl.fedoraproject.org/pub/archive/epel/7/SRPMS/Packages/o/openssl11-1.1.1k-7.el7.src.rpm
+          file openssl11.src.rpm | grep -q RPM
           docker run --rm -i -v "$PWD:/ws" -w /ws centos:6 bash -euo pipefail -s <<'EOS'
           sed -i -e 's/^mirrorlist=/#mirrorlist=/' \
                  -e 's|^#baseurl=http://mirror.centos.org/centos/\$releasever|baseurl=http://vault.centos.org/6.10|' \
@@ -24,7 +27,7 @@ jobs:
           grep -q 'vault.centos.org/6.10' /etc/yum.repos.d/CentOS-Base.repo
 
           yum install -y yum-utils rpm-build
-          rpm -ivh https://dl.fedoraproject.org/pub/archive/epel/7/SRPMS/Packages/o/openssl11-1.1.1k-7.el7.src.rpm
+          rpm -ivh /ws/openssl11.src.rpm
           cp /ws/openssl11.spec ~/rpmbuild/SPECS/
 
           yum-builddep -y ~/rpmbuild/SPECS/openssl11.spec || true
