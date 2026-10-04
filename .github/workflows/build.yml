@@ -55,4 +55,10 @@ jobs:
           PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
         run: |
           sudo gem install package_cloud
-          package_cloud push --skip-duplicates "$PACKAGECLOUD_REPO/el/6" dist/*.rpm
+
+          # --skip-duplicates 与当前 API 的报错文本对不上（它要求值恰好是 "has already been taken"）
+          for f in dist/*.rpm; do
+            out=$(package_cloud push "$PACKAGECLOUD_REPO/el/6" "$f" 2>&1) && { echo "pushed $f"; continue; }
+            grep -q 'already been taken' <<<"$out" || { echo "$out"; exit 1; }
+            echo "skip (already exists): $f"
+          done
